@@ -7,7 +7,9 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 
-from model import LeNet5
+import sys
+sys.path.insert(0,"..")
+from model.model import LeNet5
 
 def train(args, model, device, train_loader, optimizer, epoch):
     model.train()
