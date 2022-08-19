@@ -98,10 +98,6 @@ def test(model, test_loader):
 
     test_loss /= len(test_loader.dataset)
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
-
     return (100. * correct / len(test_loader.dataset))
 
 def get_quantized_model(model, output_bw, param_bw, data_loader):
@@ -182,39 +178,32 @@ def main():
     train_dataset = Subset(dataset1, indices)
     dataset2 = datasets.FashionMNIST('../../data', train=False,
                        transform=transform)
-    print (len(train_dataset))
     train_loader = torch.utils.data.DataLoader(train_dataset,**train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
-
 
     model = LeNet5().to(device)
     model.load_state_dict(torch.load(MODEL_PATH))
 
-    #optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-
-    #scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     acc_before_quant = test(model, test_loader)
-    print ("FP32 model accuracy: %f" % (acc_before_quant))
+    print ("FP32 model's accuracy: %f" % (acc_before_quant))
 
     model_copy = copy.deepcopy(model)
     model_copy.eval()
 
     input_shape = (1, 1, 28, 28)
     folded_pairs = batch_norm_fold.fold_all_batch_norms(model_copy, input_shape)
-    print (folded_pairs)
     bn_dict = {}
     for conv_bn in folded_pairs:
         bn_dict[conv_bn[0]] = conv_bn[1]
-    print (model_copy)
     _model = get_quantized_model(model_copy, 4, 4, train_loader)
     acc_after_fold = test(_model, test_loader)
-    print ("Model accuracy after fold: %f" % (acc_after_fold))
+    print ("Model's accuracy after fold: %f" % (acc_after_fold))
 
     cls_set_info_list = CrossLayerScaling.scale_model(model_copy, input_shape)
     HighBiasFold.bias_fold(cls_set_info_list, bn_dict)
     _model = get_quantized_model(model_copy, 4, 4, train_loader)
     acc_after_equalized = test(_model, test_loader)
-    print ("Model accuracy after equalized: %f" % (acc_after_equalized))
+    print ("Model's accuracy after equalized: %f" % (acc_after_equalized))
 
     dataset_size = 200
     batch_size = 64
@@ -223,9 +212,9 @@ def main():
     # Perform Bias Correction
     bias_correction.correct_bias(model_copy, params, num_quant_samples=1024,
                                  data_loader=data_loader, num_bias_correct_samples=512)
-    _model = get_quantized_model(model_copy, 4, 2, train_loader)
+    _model = get_quantized_model(model_copy, 4, 4, train_loader)
     acc_after_equalized = test(_model, test_loader)
-    print ("Model accuracy after bias correction: %f" % (acc_after_equalized))
+    print ("Model's accuracy after bias correction: %f" % (acc_after_equalized))
 
 if __name__ == '__main__':
     main()

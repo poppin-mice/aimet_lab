@@ -50,4 +50,4 @@ export CUDNN_INSTALL_PATH=/usr/local/cuda
 export CUDA_HOME=/usr/local/cuda
 export NVIDIA_DRIVER_CAPABILITIES=compute,utility
 export NVIDIA_VISIBLE_DEVICES=all
-export PYTHONPATH=/home/edan/workspace/aimet_lab/venv/lib/python3.6/site-packages/aimet_common/x86_64-linux-gnu:$PYTHONPATH
+export PYTHONPATH=~/workspace/aimet_lab/venv/lib/python3.6/site-packages/aimet_common/x86_64-linux-gnu:$PYTHONPATH

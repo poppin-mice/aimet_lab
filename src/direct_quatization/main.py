@@ -73,6 +73,14 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 BATCH_SIZE = 128
 
+def forward_pass(model, test_loader):
+    model.eval()
+    with torch.no_grad():
+        for data, target in test_loader:
+            data, target = data.to(device), target.to(device)
+            output = model(data)
+            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+
 def test(model, test_loader):
     model.eval()
     test_loss = 0
@@ -86,10 +94,6 @@ def test(model, test_loader):
             correct += pred.eq(target.view_as(pred)).sum().item()
 
     test_loss /= len(test_loader.dataset)
-
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
 
     return (100. * correct / len(test_loader.dataset))
 
@@ -142,39 +146,21 @@ def main():
     train_dataset = Subset(dataset1, indices)
     dataset2 = datasets.FashionMNIST('../../data', train=False,
                        transform=transform)
-    print (len(train_dataset))
     train_loader = torch.utils.data.DataLoader(train_dataset,**train_kwargs)
     test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
 
 
     model = LeNet5().to(device)
     model.load_state_dict(torch.load(MODEL_PATH))
-    #model = mnist_torch_model.Net().to(device)
-    #model.load_state_dict(torch.load(MODEL_PATH))
-
-    #optimizer = optim.Adadelta(model.parameters(), lr=args.lr)
-
-    #scheduler = StepLR(optimizer, step_size=1, gamma=args.gamma)
     acc_before_quant = test(model, test_loader)
-    print ("FP32 model accuracy: %f" % (acc_before_quant))
+    print ("FP32 model's accuracy: %f \n" % (acc_before_quant))
 
     model_copy = copy.deepcopy(model)
     model_copy.eval()
-    sim = QuantizationSimModel(model_copy, default_output_bw=4, default_param_bw=4, dummy_input=torch.rand(1, 1, 28, 28).to(device))
-    #print (sim.model)
-    sim.compute_encodings(forward_pass_callback=test, forward_pass_callback_args=train_loader)
+    sim = QuantizationSimModel(model_copy, default_output_bw=8, default_param_bw=8, dummy_input=torch.rand(1, 1, 28, 28).to(device))
+    sim.compute_encodings(forward_pass_callback=forward_pass, forward_pass_callback_args=train_loader)
     acc_after_quant_train = test(sim.model, test_loader)
-    print ("Output bit: %d, params bit: %d, model accuracy: %f" %(4, 4, acc_after_quant_train))
-
-    
-    #for epoch in range(1, args.epochs + 1):
-    #    train(args, model, device, train_loader, optimizer, epoch)
-    #    test(model, device, test_loader)
-    #    scheduler.step()
-
-    #if args.save_model:
-    #    torch.save(model.state_dict(), "../../checkpoint/mnist_cnn.pt")
-
+    print ("Output bit: %d, params bit: %d, model's accuracy: %f \n" %(8, 8, acc_after_quant_train))
 
 if __name__ == '__main__':
     main()
