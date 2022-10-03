@@ -1,7 +1,6 @@
 from __future__ import print_function
 import argparse
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torchvision import datasets, transforms
@@ -49,7 +48,7 @@ def test(model, device, test_loader):
 
 def main():
     # Training settings
-    parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
+    parser = argparse.ArgumentParser(description='PyTorch FashionMNIST Example')
     parser.add_argument('--batch-size', type=int, default=128, metavar='N',
                         help='input batch size for training (default: 128)')
     parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
@@ -90,12 +89,12 @@ def main():
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
         ])
-    dataset1 = datasets.FashionMNIST('../../data', train=True, download=True,
+    dataset_train = datasets.FashionMNIST('../../data', train=True, download=True,
                        transform=transform)
-    dataset2 = datasets.FashionMNIST('../../data', train=False,
+    dataset_test = datasets.FashionMNIST('../../data', train=False,
                        transform=transform)
-    train_loader = torch.utils.data.DataLoader(dataset1,**train_kwargs)
-    test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
+    train_loader = torch.utils.data.DataLoader(dataset_train,**train_kwargs)
+    test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
 
     model = LeNet5().to(device)
 

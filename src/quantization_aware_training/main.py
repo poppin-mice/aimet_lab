@@ -1,15 +1,8 @@
 from __future__ import division
 
-import numpy as np
-
 import argparse
 
-import PIL
-import numpy as np
-from tqdm import tqdm
 import copy
-
-import torchvision
 
 import torch
 import torch.nn.functional as F
@@ -21,7 +14,6 @@ from torchvision import datasets, transforms
 
 # Quantization related import
 from aimet_torch.quantsim import QuantizationSimModel
-from aimet_torch.examples import mnist_torch_model
 
 import sys
 sys.path.insert(0,"..")

@@ -1,55 +1,9 @@
 from __future__ import division
 
-# /usr/bin/env python3.5
-# -*- mode: python -*-
-# =============================================================================
-#  @@-COPYRIGHT-START-@@
-#  
-#  Copyright (c) 2019, Qualcomm Innovation Center, Inc. All rights reserved.
-#  
-#  Redistribution and use in source and binary forms, with or without 
-#  modification, are permitted provided that the following conditions are met:
-#  
-#  1. Redistributions of source code must retain the above copyright notice, 
-#     this list of conditions and the following disclaimer.
-#  
-#  2. Redistributions in binary form must reproduce the above copyright notice, 
-#     this list of conditions and the following disclaimer in the documentation 
-#     and/or other materials provided with the distribution.
-#  
-#  3. Neither the name of the copyright holder nor the names of its contributors 
-#     may be used to endorse or promote products derived from this software 
-#     without specific prior written permission.
-#  
-#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" 
-#  AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE 
-#  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE 
-#  ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE 
-#  LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
-#  CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
-#  SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS 
-#  INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN 
-#  CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-#  ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-#  POSSIBILITY OF SUCH DAMAGE.
-#  
-#  SPDX-License-Identifier: BSD-3-Clause
-#  
-#  @@-COPYRIGHT-END-@@
-# =============================================================================
-# pylint: disable=missing-docstring
-""" These are code examples to be used when generating AIMET documentation via Sphinx """
-
-import numpy as np
-
 import argparse
 
-import PIL
 import numpy as np
-from tqdm import tqdm
 import copy
-
-import torchvision
 
 import torch
 import torch.nn.functional as F
@@ -58,17 +12,15 @@ from torch.utils.data import Subset
 from torchvision import datasets, transforms
 
 # Quantization related import
-from aimet_common.utils import AimetLogger
 from aimet_common.defs import QuantScheme
 from aimet_torch.quantsim import QuantizationSimModel
 
 from aimet_torch import batch_norm_fold
-from aimet_torch import utils
 
 from aimet_torch import bias_correction
 from aimet_torch.quantsim import QuantParams
 
-from aimet_torch.cross_layer_equalization import equalize_model, CrossLayerScaling, HighBiasFold
+from aimet_torch.cross_layer_equalization import CrossLayerScaling, HighBiasFold
 
 import sys
 sys.path.insert(0,"..")
@@ -136,22 +88,10 @@ def main():
                         help='input batch size for training (default: 128)')
     parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
-    parser.add_argument('--epochs', type=int, default=1, metavar='N',
-                        help='number of epochs to train (default: 1)')
-    parser.add_argument('--lr', type=float, default=1.0, metavar='LR',
-                        help='learning rate (default: 1.0)')
-    parser.add_argument('--gamma', type=float, default=0.7, metavar='M',
-                        help='Learning rate step gamma (default: 0.7)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
-    parser.add_argument('--dry-run', action='store_true', default=False,
-                        help='quickly check a single pass')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
-                        help='how many batches to wait before logging training status')
-    parser.add_argument('--save-model', action='store_true', default=False,
-                        help='For Saving the current Model')
     args = parser.parse_args()
     use_cuda = not args.no_cuda and torch.cuda.is_available()
 
@@ -172,14 +112,14 @@ def main():
         transforms.ToTensor(),
         transforms.Normalize((0.1307,), (0.3081,))
         ])
-    dataset1 = datasets.FashionMNIST('../../data', train=True, download=True,
+    dataset_train = datasets.FashionMNIST('../../data', train=True, download=True,
                        transform=transform)
-    indices = torch.randperm(len(dataset1))[:100]
-    train_dataset = Subset(dataset1, indices)
-    dataset2 = datasets.FashionMNIST('../../data', train=False,
+    indices = torch.randperm(len(dataset_train))[:100]
+    train_dataset = Subset(dataset_train, indices)
+    dataset_test = datasets.FashionMNIST('../../data', train=False,
                        transform=transform)
     train_loader = torch.utils.data.DataLoader(train_dataset,**train_kwargs)
-    test_loader = torch.utils.data.DataLoader(dataset2, **test_kwargs)
+    test_loader = torch.utils.data.DataLoader(dataset_test, **test_kwargs)
 
     model = LeNet5().to(device)
     model.load_state_dict(torch.load(MODEL_PATH))
@@ -195,24 +135,24 @@ def main():
     bn_dict = {}
     for conv_bn in folded_pairs:
         bn_dict[conv_bn[0]] = conv_bn[1]
-    _model = get_quantized_model(model_copy, 4, 4, train_loader)
+    _model = get_quantized_model(model_copy, 6, 4, train_loader)
     acc_after_fold = test(_model, test_loader)
     print ("Model's accuracy after fold: %f" % (acc_after_fold))
 
     cls_set_info_list = CrossLayerScaling.scale_model(model_copy, input_shape)
     HighBiasFold.bias_fold(cls_set_info_list, bn_dict)
-    _model = get_quantized_model(model_copy, 4, 4, train_loader)
+    _model = get_quantized_model(model_copy, 6, 4, train_loader)
     acc_after_equalized = test(_model, test_loader)
     print ("Model's accuracy after equalized: %f" % (acc_after_equalized))
 
     dataset_size = 200
     batch_size = 64
     data_loader = create_fake_data_loader(dataset_size=dataset_size, batch_size=batch_size, image_size=(1, 28, 28))
-    params = QuantParams(weight_bw=4, act_bw=4, round_mode="nearest", quant_scheme=QuantScheme.post_training_tf_enhanced)
+    params = QuantParams(weight_bw=4, act_bw=6, round_mode="nearest", quant_scheme=QuantScheme.post_training_tf_enhanced)
     # Perform Bias Correction
     bias_correction.correct_bias(model_copy, params, num_quant_samples=1024,
                                  data_loader=data_loader, num_bias_correct_samples=512)
-    _model = get_quantized_model(model_copy, 4, 4, train_loader)
+    _model = get_quantized_model(model_copy, 6, 4, train_loader)
     acc_after_equalized = test(_model, test_loader)
     print ("Model's accuracy after bias correction: %f" % (acc_after_equalized))
 
